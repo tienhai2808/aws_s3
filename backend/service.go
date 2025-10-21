@@ -2,23 +2,27 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
+	awsS3 "github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/google/uuid"
 )
 
 type serviceImpl struct {
-	presigner *s3.PresignClient
+	client    *awsS3.Client
+	presigner *awsS3.PresignClient
 	bucket    string
 	folder    string
 	region    string
 }
 
-func newService(presigner *s3.PresignClient, bucket, folder, region string) service {
+func newService(client *awsS3.Client, presigner *awsS3.PresignClient, bucket, folder, region string) service {
 	return &serviceImpl{
+		client,
 		presigner,
 		bucket,
 		folder,
@@ -26,24 +30,69 @@ func newService(presigner *s3.PresignClient, bucket, folder, region string) serv
 	}
 }
 
-func (s *serviceImpl) CreateUploadURL(ctx context.Context, req presignedURLRequest) (*presignedURLResponse, error) {
+func (s *serviceImpl) createUploadURL(ctx context.Context, req presignedURLRequest) (*presignedURLResponse, error) {
 	objectKey := fmt.Sprintf("%s/%s-%s", s.folder, uuid.New().String(), req.FileName)
 
-	presignedReq, err := s.presigner.PresignPutObject(ctx, &s3.PutObjectInput{
+	presignedReq, err := s.presigner.PresignPutObject(ctx, &awsS3.PutObjectInput{
 		Bucket:      aws.String(s.bucket),
 		Key:         aws.String(objectKey),
 		ContentType: aws.String(req.ContentType),
-	}, func(opts *s3.PresignOptions) {
+	}, func(opts *awsS3.PresignOptions) {
 		opts.Expires = 15 * time.Minute
 	})
 	if err != nil {
-		return nil, fmt.Errorf("generate presigned URL thất bại: %w", err)
+		return nil, fmt.Errorf("generate presigned URL upload file thất bại: %w", err)
 	}
-
-	fileURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com/%s", s.bucket, s.region, objectKey)
 
 	return &presignedURLResponse{
 		UploadURL: presignedReq.URL,
-		FileURL: fileURL,
+		ObjectKey: objectKey,
 	}, nil
+}
+
+func (s *serviceImpl) createViewURL(ctx context.Context, key string) (string, error) {
+	if _, err := s.client.HeadObject(ctx, &awsS3.HeadObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(key),
+	}); err != nil {
+		var keyNotFound *types.NotFound
+		if errors.As(err, &keyNotFound) {
+			return "", errFileNotFound
+		}
+		return "", fmt.Errorf("kiểm tra file thất bại: %w", err)
+	}
+
+	presignedReq, err := s.presigner.PresignGetObject(ctx, &awsS3.GetObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(key),
+	}, func(opts *awsS3.PresignOptions) {
+		opts.Expires = 15 * time.Minute
+	})
+	if err != nil {
+		return "", fmt.Errorf("generate presigned URL xem file thất bại: %w", err)
+	}
+
+	return presignedReq.URL, nil
+}
+
+func (s *serviceImpl) deleteFile(ctx context.Context, key string) error {
+	if _, err := s.client.HeadObject(ctx, &awsS3.HeadObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(key),
+	}); err != nil {
+		var keyNotFound *types.NotFound
+		if errors.As(err, &keyNotFound) {
+			return errFileNotFound
+		}
+		return fmt.Errorf("kiểm tra file thất bại: %w", err)
+	}
+
+	if _, err := s.client.DeleteObject(ctx, &awsS3.DeleteObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(key),
+	}); err != nil {
+		return fmt.Errorf("xóa file trên S3 thất bại: %w", err)
+	}
+
+	return nil
 }

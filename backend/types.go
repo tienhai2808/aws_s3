@@ -3,7 +3,11 @@ package main
 import "context"
 
 type service interface {
-	CreateUploadURL(ctx context.Context, req presignedURLRequest) (*presignedURLResponse, error)
+	createUploadURL(ctx context.Context, req presignedURLRequest) (*presignedURLResponse, error)
+
+	createViewURL(ctx context.Context, key string) (string, error)
+
+	deleteFile(ctx context.Context, key string) error
 }
 
 type presignedURLRequest struct {
@@ -13,7 +17,7 @@ type presignedURLRequest struct {
 
 type presignedURLResponse struct {
 	UploadURL string `json:"upload_url"`
-	FileURL   string `json:"file_url"`
+	ObjectKey string `json:"object_key"`
 }
 
 type apiResponse struct {
