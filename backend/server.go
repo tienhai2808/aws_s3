@@ -21,12 +21,14 @@ func newServer(cfg *config) (*server, error) {
 	svc := newService(presigner, cfg.AWS.Bucket, cfg.AWS.Folder, cfg.AWS.Region)
 	hdl := newHandler(svc)
 
-  r := httprouter.New()
+	r := httprouter.New()
 	router(r, hdl)
 
 	http := &http.Server{
-		Addr:           ":5000",
-		Handler:        r,
+		Addr: ":5000",
+		Handler: logRequestMiddleware(
+			corsMiddleware(r),
+		),
 		MaxHeaderBytes: 100 * 1024 * 1024,
 	}
 
