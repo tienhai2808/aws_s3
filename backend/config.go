@@ -8,11 +8,13 @@ import (
 )
 
 type config struct {
-	aws struct {
-		accessKeyID     string `yaml:"access_key_id"`
-		secretAccessKey string `yaml:"secret_access_key"`
-		region          string `yaml:"region"`
-	}
+	AWS struct {
+		Bucket          string `yaml:"bucket"`
+		Folder          string `yaml:"folder"`
+		AccessKeyID     string `yaml:"access_key_id"`
+		SecretAccessKey string `yaml:"secret_access_key"`
+		Region          string `yaml:"region"`
+	} `yaml:"aws"`
 }
 
 func loadConfig() (*config, error) {

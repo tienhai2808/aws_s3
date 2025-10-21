@@ -13,15 +13,15 @@ type server struct {
 }
 
 func newServer(cfg *config) (*server, error) {
-	_, err := initS3(cfg)
+	presigner, err := initS3(cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	r := httprouter.New()
-	
-	hdl := newHandler()
+	svc := newService(presigner, cfg.AWS.Bucket, cfg.AWS.Folder, cfg.AWS.Region)
+	hdl := newHandler(svc)
 
+  r := httprouter.New()
 	router(r, hdl)
 
 	http := &http.Server{

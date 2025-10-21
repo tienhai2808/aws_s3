@@ -11,14 +11,14 @@ import (
 
 func initS3(cfg *config) (*s3.PresignClient, error) {
 	staticCredentials := credentials.NewStaticCredentialsProvider(
-		cfg.aws.accessKeyID, 
-		cfg.aws.secretAccessKey, 
+		cfg.AWS.AccessKeyID, 
+		cfg.AWS.SecretAccessKey, 
 		"",
 	)
 
 	awsCfg, err := awsConfig.LoadDefaultConfig(
 		context.TODO(), 
-		awsConfig.WithRegion(cfg.aws.region), 
+		awsConfig.WithRegion(cfg.AWS.Region), 
 		awsConfig.WithCredentialsProvider(staticCredentials),
 	)
 	if err != nil {
